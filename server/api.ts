@@ -561,6 +561,138 @@ export function createApiApp(): express.Application {
     }
   });
 
+  // 15b. One-Tap Connect: saves Client ID & Secret (if provided) and returns Google authorization URL
+  app.post('/api/auth/connect', (req: Request, res: Response) => {
+    try {
+      const auth = loadAuthState();
+      const rawClientId = req.body.clientId || auth.clientId;
+      const rawClientSecret = req.body.clientSecret || auth.clientSecret;
+
+      const cleanId = cleanCredentialString(rawClientId);
+      const cleanSecret = cleanCredentialString(rawClientSecret);
+
+      if (!cleanId || !cleanSecret) {
+        return res.status(400).json({
+          error: 'Please enter both your Google OAuth Client ID and Client Secret.',
+        });
+      }
+
+      if (!cleanId.includes('.apps.googleusercontent.com')) {
+        return res.status(400).json({
+          error: 'Invalid Client ID format. It must end with ".apps.googleusercontent.com"',
+        });
+      }
+
+      // Persist credentials in secure server storage
+      updateAuthState({
+        clientId: cleanId,
+        clientSecret: cleanSecret,
+      });
+
+      const redirectUri = getCanonicalRedirectUri(req);
+      const scopes = [
+        'https://www.googleapis.com/auth/youtube.upload',
+        'https://www.googleapis.com/auth/youtube.readonly',
+        'https://www.googleapis.com/auth/youtube.force-ssl',
+        'openid',
+        'profile',
+        'email',
+      ].join(' ');
+
+      const params = new URLSearchParams({
+        client_id: cleanId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: scopes,
+        access_type: 'offline',
+        prompt: 'consent select_account',
+        include_granted_scopes: 'true',
+      });
+
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      logActivity('auth', 'Generated official Google OAuth consent URL for user.');
+
+      res.json({
+        success: true,
+        url,
+        redirectUri,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // 15c. Test Live Private YouTube Upload
+  app.post('/api/auth/test-upload', async (req: Request, res: Response) => {
+    try {
+      const verifyRes = await verifyYouTubeCredentials();
+      if (!verifyRes.success) {
+        return res.status(400).json({
+          error: `Cannot test upload: YouTube connection is not verified (${verifyRes.error || 'Unknown error'}). Please connect first.`,
+        });
+      }
+
+      const jobs = loadJobs();
+      const mediaDir = getMediaDir();
+      const readyJob = jobs.find(j => j.status === 'ready' && j.videoFilename && fs.existsSync(path.join(mediaDir, j.videoFilename)));
+
+      if (readyJob) {
+        logActivity('upload', `Initiating test private upload for existing job: ${readyJob.id}`);
+        updateJob(readyJob.id, {
+          status: 'uploading',
+          progress: 85,
+          statusMessage: 'Uploading private test video to YouTube...',
+        });
+
+        uploadVideoToYouTube(readyJob, 'private', undefined, (percent, msg) => {
+          updateJob(readyJob.id, { progress: Math.min(99, 85 + Math.floor(percent * 0.14)), statusMessage: msg });
+        })
+          .then(({ videoId, youtubeUrl }) => {
+            updateJob(readyJob.id, {
+              status: 'uploaded',
+              progress: 100,
+              statusMessage: `Uploaded as PRIVATE test video: ${youtubeUrl}`,
+              youtubeVideoId: videoId,
+              youtubeUrl,
+              youtubePrivacyStatus: 'private',
+            });
+            logActivity('upload', `Test private upload complete: ${youtubeUrl}`);
+          })
+          .catch(err => {
+            updateJob(readyJob.id, {
+              status: 'ready',
+              statusMessage: `Upload error: ${err.message}`,
+              error: err.message,
+            });
+          });
+
+        return res.json({
+          success: true,
+          message: 'Test private upload started for existing video.',
+          jobId: readyJob.id,
+        });
+      }
+
+      // If no video exists on disk, trigger generation and automated upload as private
+      logActivity('upload', 'No existing video on disk. Generating a fresh MrBeast challenge video for private test upload...');
+      const pipelinePromise = runAutomatedPipeline(undefined, true);
+      const latestJobs = loadJobs();
+      const newJob = latestJobs[0];
+
+      res.json({
+        success: true,
+        message: 'Generating video and uploading to YouTube as Private...',
+        jobId: newJob?.id,
+      });
+
+      pipelinePromise.catch(err => {
+        console.error('Test upload pipeline error:', err);
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // 16. Get Google OAuth Authorization URL (for 1-Tap Official Consent Flow)
   app.get('/api/auth/google/url', (req: Request, res: Response) => {
     try {

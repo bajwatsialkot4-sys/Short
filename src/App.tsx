@@ -193,29 +193,58 @@ export default function App() {
     setTimeout(() => setNotification(null), 6000);
   };
 
-  // Google OAuth Connect - Launches 1-Tap Google OAuth Consent Flow or opens Settings
+  // One-Tap Connect My YouTube Channel: sends Client ID & Secret and opens Google official OAuth page
   const handleConnectYouTube = async () => {
-    if (status?.auth.hasClientId) {
-      await handleStartGoogleConsent();
-    } else {
-      setShowSettings(true);
-    }
-  };
+    const cid = customClientId.trim();
+    const csecret = customClientSecret.trim();
 
-  // Launch official Google OAuth 2.0 authorization screen
-  const handleStartGoogleConsent = async () => {
+    if (!cid && !status?.auth.hasClientId) {
+      showNotice('error', 'Please enter your Google OAuth Client ID.');
+      return;
+    }
+    if (!csecret && !status?.auth.hasClientSecret) {
+      showNotice('error', 'Please enter your Google OAuth Client Secret.');
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const res = await fetch('/api/auth/google/url');
+      showNotice('info', 'Connecting to Google OAuth...');
+      const res = await fetch('/api/auth/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: cid || undefined,
+          clientSecret: csecret || undefined,
+        }),
+      });
       const data = await res.json();
       if (!res.ok || !data.url) {
-        throw new Error(data.error || 'Failed to generate Google OAuth authorization URL');
+        throw new Error(data.error || 'Failed to initialize Google OAuth connection.');
       }
-      showNotice('info', 'Opening official Google authorization...');
+
+      showNotice('info', 'Opening official Google Account authorization...');
       window.location.href = data.url;
     } catch (err: any) {
       showNotice('error', err.message);
-      setShowSettings(true);
+      setActionLoading(false);
+    }
+  };
+
+  // Test Live Private YouTube Upload
+  const handleTestPrivateUpload = async () => {
+    setActionLoading(true);
+    try {
+      showNotice('info', 'Initiating private YouTube test upload...');
+      const res = await fetch('/api/auth/test-upload', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Test upload request failed');
+      }
+      showNotice('success', data.message || 'Private test upload initiated!');
+      await fetchState();
+    } catch (err: any) {
+      showNotice('error', `Test upload failed: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
@@ -517,12 +546,19 @@ export default function App() {
               </h2>
             </div>
             {isChannelConnected ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Connected & Verified
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Connected & Verified</span>
+              </span>
+            ) : status?.auth.lastVerificationError ? (
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                <span>Not Connected (Error)</span>
               </span>
             ) : (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                Action Required
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>Not Connected</span>
               </span>
             )}
           </div>
@@ -535,10 +571,10 @@ export default function App() {
                     <img
                       src={status.auth.channelThumbnail}
                       alt="Channel Avatar"
-                      className="w-11 h-11 rounded-full border border-slate-700 object-cover"
+                      className="w-12 h-12 rounded-full border border-slate-700 object-cover"
                     />
                   ) : (
-                    <div className="w-11 h-11 rounded-full bg-red-600 flex items-center justify-center font-bold text-white">
+                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center font-bold text-white text-sm">
                       YT
                     </div>
                   )}
@@ -548,15 +584,15 @@ export default function App() {
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     </h3>
                     <p className="text-[11px] text-slate-400">
-                      {status?.auth.channelHandle} • {status?.auth.subscribers || '0'} subscribers
+                      {status?.auth.channelHandle} • {status?.auth.subscribers || '0'} subscribers • {status?.auth.videoCount || '0'} videos
                     </p>
                     <div className="flex items-center space-x-1.5 mt-1">
                       <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">
-                        ⚡ 24/7 Google OAuth Active
+                        ⚡ 24/7 Autonomous Uploads Active
                       </span>
                       {status?.auth.lastVerifiedAt && (
                         <span className="text-[10px] text-slate-400">
-                          Tested: {new Date(status.auth.lastVerifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          Verified: {new Date(status.auth.lastVerifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                     </div>
@@ -573,96 +609,128 @@ export default function App() {
               </div>
 
               {/* Action buttons when connected */}
-              <div className="flex items-center space-x-2 pt-2 border-t border-slate-900">
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-900">
                 <button
                   onClick={handleVerifySavedCredentials}
                   disabled={actionLoading}
-                  className="flex-1 py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-center space-x-1.5 transition-colors"
+                  className="py-2 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-center space-x-1.5 transition-colors border border-slate-700/60"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${actionLoading ? 'animate-spin' : ''}`} />
-                  <span>Test Connection with YouTube</span>
+                  <span>Test Connection</span>
                 </button>
 
                 <button
-                  onClick={() => setShowSettings(true)}
-                  className="py-1.5 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs text-slate-400 hover:text-white border border-slate-800 transition-colors"
+                  onClick={handleTestPrivateUpload}
+                  disabled={actionLoading}
+                  className="py-2 px-2.5 rounded-lg bg-red-950/60 hover:bg-red-900/60 text-xs font-semibold text-red-200 flex items-center justify-center space-x-1.5 transition-colors border border-red-800/60"
                 >
-                  Configure
+                  <Upload className="w-3.5 h-3.5 text-red-400" />
+                  <span>Test Private Upload</span>
                 </button>
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
+              {/* Exact Error Diagnostic Display if verification or auth failed */}
               {status?.auth.lastVerificationError && (
                 <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-800/80 text-[11px] text-rose-200 space-y-1.5 animate-in fade-in">
                   <div className="flex items-center space-x-1.5 font-bold text-rose-300">
                     <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>OAuth Diagnostic Notice</span>
+                    <span>Exact Connection Error</span>
                   </div>
-                  <p className="text-slate-300 leading-relaxed break-words">
+                  <p className="text-slate-300 leading-relaxed break-words font-mono text-[10px] bg-black/40 p-2 rounded border border-rose-900/50">
                     {status.auth.lastVerificationError}
                   </p>
-                  {status.auth.hasClientId && (
-                    <div className="pt-1">
-                      <button
-                        onClick={handleStartGoogleConsent}
-                        disabled={actionLoading}
-                        className="py-1 px-2.5 rounded bg-rose-800 hover:bg-rose-700 text-white font-semibold text-[10px] transition-colors"
-                      >
-                        ⚡ Re-Authorize with 1-Tap Google Connect
-                      </button>
-                    </div>
-                  )}
+                  <p className="text-slate-400 text-[11px]">
+                    Tip: If Google shows a 403 access error, add <strong className="text-white">ukusa2439@gmail.com</strong> to <strong className="text-white">Test users</strong> in Google Cloud Console → OAuth consent screen.
+                  </p>
                 </div>
               )}
 
               <p className="text-xs text-slate-400 leading-relaxed">
-                Connect your YouTube channel using Google Cloud OAuth (Web Client 5). The server securely refreshes tokens and automatically uploads scheduled MrBeast challenge Shorts 24/7.
+                Connect your YouTube channel using your own Google Cloud Web Client. Your credentials and refresh tokens are stored securely on the server and never exposed in the browser.
               </p>
 
-              <div className="space-y-2">
-                {status?.auth.hasClientId ? (
-                  <button
-                    onClick={handleConnectYouTube}
-                    disabled={actionLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all"
-                  >
-                    <Youtube className="w-5 h-5 shrink-0" />
-                    <span>Connect YouTube Channel with Google (1-Tap)</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowSettings(true)}
-                    disabled={actionLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all"
-                  >
-                    <Settings className="w-4 h-4 shrink-0 text-amber-300" />
-                    <span>Configure Google Cloud Web Client 5</span>
-                  </button>
-                )}
+              {/* Simple Setup Screen: Exactly Two Credential Fields */}
+              <div className="bg-slate-950 border border-slate-800/90 rounded-xl p-3.5 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                    <span>1. Google OAuth Client ID</span>
+                    {status?.auth.hasClientId && (
+                      <span className="text-[10px] text-emerald-400 font-mono font-normal">
+                        Saved: {status.auth.clientIdMasked}
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={customClientId}
+                    onChange={(e) => setCustomClientId(e.target.value)}
+                    placeholder={
+                      status?.auth.hasClientId
+                        ? 'Saved on server (leave blank to keep, or paste new to replace)'
+                        : 'Paste Client ID (e.g. 123456-abc.apps.googleusercontent.com)'
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-red-500 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none transition-colors"
+                  />
+                </div>
 
-                {status?.auth.hasRefreshToken && (
-                  <button
-                    onClick={handleVerifySavedCredentials}
-                    disabled={actionLoading}
-                    className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-semibold flex items-center justify-center space-x-2 transition-colors border border-slate-700/60"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${actionLoading ? 'animate-spin' : ''}`} />
-                    <span>Test Saved Credentials with Live API</span>
-                  </button>
-                )}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                    <span>2. Google OAuth Client Secret</span>
+                    {status?.auth.hasClientSecret && (
+                      <span className="text-[10px] text-emerald-400 font-normal">
+                        Saved on server
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="password"
+                    value={customClientSecret}
+                    onChange={(e) => setCustomClientSecret(e.target.value)}
+                    placeholder={
+                      status?.auth.hasClientSecret
+                        ? '•••••••••••••••• (Saved on server - leave blank to keep)'
+                        : 'Paste Client Secret from Google Cloud Console'
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-red-500 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none transition-colors"
+                  />
+                </div>
 
+                {/* The One Prominent Button */}
                 <button
-                  onClick={() => setShowSettings(true)}
-                  className="w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
+                  onClick={handleConnectYouTube}
+                  disabled={actionLoading}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all disabled:opacity-50"
                 >
-                  OAuth & Refresh Token Settings
+                  <Youtube className="w-5 h-5 shrink-0" />
+                  <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel'}</span>
                 </button>
               </div>
 
-              <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-500">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Official Google OAuth 2.0. Secrets are kept server-side in persistent storage.</span>
+              {/* Redirect URI copy-helper box */}
+              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] space-y-1.5">
+                <div className="font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Authorized Redirect URI for Google Cloud</span>
+                </div>
+                <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-cyan-300 overflow-x-auto">
+                  <span className="truncate flex-1">
+                    {status?.auth.redirectUri || (typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback` : '/api/auth/callback')}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const uri = status?.auth.redirectUri || `${window.location.origin}/api/auth/callback`;
+                      navigator.clipboard.writeText(uri);
+                      showNotice('info', 'Redirect URI copied to clipboard!');
+                    }}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Add this URI in Google Cloud Console → APIs & Services → Credentials → Web Client 5.
+                </p>
               </div>
             </div>
           )}
@@ -1285,12 +1353,12 @@ export default function App() {
                   Connects directly to Google OAuth using your Web Client 5. Google issues a 100% matched refresh token automatically with zero copy-pasting.
                 </p>
                 <button
-                  onClick={handleStartGoogleConsent}
+                  onClick={handleConnectYouTube}
                   disabled={actionLoading || (!status?.auth.hasClientId && !customClientId.trim())}
                   className="w-full py-2.5 rounded-lg bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs transition-colors shadow-sm flex items-center justify-center space-x-1.5 disabled:opacity-50"
                 >
                   <Youtube className="w-4 h-4 shrink-0" />
-                  <span>Authorize YouTube Channel with Google (1-Tap)</span>
+                  <span>Connect My YouTube Channel</span>
                 </button>
               </div>
 

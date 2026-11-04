@@ -1,5 +1,29 @@
 [
   {
+    "id": "log_1793795719027_n5t50",
+    "timestamp": "2026-11-04T12:35:19.027Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL for user."
+  },
+  {
+    "id": "log_1793795718763_nypwv",
+    "timestamp": "2026-11-04T12:35:18.763Z",
+    "type": "scheduler",
+    "message": "Scheduler settings updated: Disabled (03:00 & 16:00 PKT, private)"
+  },
+  {
+    "id": "log_1793795699074_0v5dq",
+    "timestamp": "2026-11-04T12:34:59.074Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793795501964_f4ywl",
+    "timestamp": "2026-11-04T12:31:41.964Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
     "id": "log_1793772931120_jvdjg",
     "timestamp": "2026-11-04T06:15:31.120Z",
     "type": "error",
