@@ -258,6 +258,9 @@ export function startScheduler(): void {
   logActivity('scheduler', 'Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)');
   // Check every 30 seconds
   schedulerInterval = setInterval(checkSchedule, 30 * 1000);
+  if (schedulerInterval && typeof schedulerInterval.unref === 'function') {
+    schedulerInterval.unref();
+  }
   // Initial check
   checkSchedule();
 }

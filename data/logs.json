@@ -1,5 +1,77 @@
 [
   {
+    "id": "log_1793804409898_uctkk",
+    "timestamp": "2026-11-04T15:00:09.898Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL for user."
+  },
+  {
+    "id": "log_1793804403198_gikct",
+    "timestamp": "2026-11-04T15:00:03.198Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793804179367_kqk07",
+    "timestamp": "2026-11-04T14:56:19.367Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793802118016_c2ck6",
+    "timestamp": "2026-11-04T14:21:58.017Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL for user."
+  },
+  {
+    "id": "log_1793802106150_e2qz5",
+    "timestamp": "2026-11-04T14:21:46.150Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793802073709_v122o",
+    "timestamp": "2026-11-04T14:21:13.709Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL for user."
+  },
+  {
+    "id": "log_1793802073703_2yarz",
+    "timestamp": "2026-11-04T14:21:13.703Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793802063470_0edqh",
+    "timestamp": "2026-11-04T14:21:03.470Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793802054233_o622g",
+    "timestamp": "2026-11-04T14:20:54.233Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793801989018_cuk6i",
+    "timestamp": "2026-11-04T14:19:49.018Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793801905485_gd7mu",
+    "timestamp": "2026-11-04T14:18:25.485Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL for user."
+  },
+  {
+    "id": "log_1793801878239_as4fv",
+    "timestamp": "2026-11-04T14:17:58.239Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
     "id": "log_1793795719027_n5t50",
     "timestamp": "2026-11-04T12:35:19.027Z",
     "type": "auth",

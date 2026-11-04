@@ -74,6 +74,7 @@ interface AppStatus {
     hasRefreshToken?: boolean;
     hasClientId?: boolean;
     hasClientSecret?: boolean;
+    clientId?: string;
     clientIdMasked?: string;
     isTokenExpired?: boolean;
     expiresInSeconds?: number;
@@ -193,8 +194,147 @@ export default function App() {
     setTimeout(() => setNotification(null), 6000);
   };
 
-  // One-Tap Connect My YouTube Channel: sends Client ID & Secret and opens Google official OAuth page
-  const handleConnectYouTube = async () => {
+  // Bulletproof API caller that never throws SyntaxError: Unexpected token 'T' on HTML/404 responses
+  const safeApi = async <T = any>(
+    url: string,
+    options?: RequestInit
+  ): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> => {
+    try {
+      const res = await fetch(url, options);
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        try {
+          const json = await res.json();
+          if (res.ok) {
+            return { ok: true, status: res.status, data: json };
+          }
+          return {
+            ok: false,
+            status: res.status,
+            data: json,
+            error: json.error || json.message || `Request failed (${res.status})`,
+          };
+        } catch (parseErr) {
+          return {
+            ok: false,
+            status: res.status,
+            data: null,
+            error: `Malformed JSON response from server (${res.status}).`,
+          };
+        }
+      }
+
+      // Non-JSON response (e.g. HTML 404/500/502 from static host or proxy)
+      const text = await res.text();
+      let friendlyError = '';
+      if (res.status === 404 || text.includes('The page could not be found') || text.includes('The page cannot be found') || text.includes('NOT_FOUND')) {
+        friendlyError = `API route not found (HTTP 404). If accessing from a published or external domain, ensure the backend API server is deployed.`;
+      } else if (res.status === 502 || res.status === 503) {
+        friendlyError = `Server temporarily unavailable (HTTP ${res.status}).`;
+      } else if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+        friendlyError = `Server returned an HTML error page instead of JSON (${res.status}).`;
+      } else {
+        friendlyError = text.slice(0, 160) || `Request failed with HTTP status ${res.status}`;
+      }
+
+      return {
+        ok: false,
+        status: res.status,
+        data: null,
+        error: friendlyError,
+      };
+    } catch (e: any) {
+      return {
+        ok: false,
+        status: 0,
+        data: null,
+        error: e.message || 'Network connection failed',
+      };
+    }
+  };
+
+  // Google Identity Services (GIS) Popup Flow - Modern, 0-redirect official Google SDK flow
+  const handleConnectWithGisPopup = async () => {
+    const cid = customClientId.trim() || status?.auth.clientId || '';
+    const csecret = customClientSecret.trim();
+
+    if (!cid) {
+      showNotice('error', 'Please enter your Google OAuth Client ID.');
+      return;
+    }
+
+    // Save client credentials to backend if entered
+    if (customClientId.trim() || csecret) {
+      try {
+        await safeApi('/api/auth/save-client', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: customClientId.trim() || undefined,
+            clientSecret: csecret || undefined,
+          }),
+        });
+      } catch {
+        // Continue if save-client has non-fatal issue
+      }
+    }
+
+    if (typeof window === 'undefined' || !(window as any).google?.accounts?.oauth2) {
+      showNotice('info', 'Google SDK loading... Falling back to direct authorization.');
+      return handleConnectRedirect();
+    }
+
+    setActionLoading(true);
+    try {
+      showNotice('info', 'Opening Google Account chooser...');
+      const client = (window as any).google.accounts.oauth2.initCodeClient({
+        client_id: cid,
+        scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+        ux_mode: 'popup',
+        select_account: true,
+        callback: async (response: any) => {
+          if (response.code) {
+            showNotice('info', 'Code received! Exchanging with YouTube API and saving credentials...');
+            const exchangeRes = await safeApi<{ success: boolean; channel?: any; error?: string }>('/api/auth/exchange-code', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: response.code,
+                redirectUri: 'postmessage',
+              }),
+            });
+
+            if (exchangeRes.ok && exchangeRes.data?.success) {
+              showNotice('success', `🎉 Connected & Verified: ${exchangeRes.data?.channel?.title || 'YouTube Channel'}!`);
+              setCustomClientId('');
+              setCustomClientSecret('');
+              await fetchState();
+            } else {
+              showNotice('error', exchangeRes.error || exchangeRes.data?.error || 'Failed to exchange authorization code.');
+              await fetchState();
+            }
+          } else if (response.error) {
+            showNotice('error', `Google popup error: ${response.error}`);
+          }
+          setActionLoading(false);
+        },
+        error_callback: (err: any) => {
+          setActionLoading(false);
+          showNotice('error', `Google authorization popup closed or blocked.`);
+        },
+      });
+
+      client.requestCode();
+    } catch (err: any) {
+      setActionLoading(false);
+      showNotice('error', err.message || 'Popup initialization failed. Trying direct redirect...');
+      handleConnectRedirect();
+    }
+  };
+
+  // Full-Page Direct Redirect Flow: sends Client ID & Secret and navigates to Google OAuth URL
+  const handleConnectRedirect = async () => {
     const cid = customClientId.trim();
     const csecret = customClientSecret.trim();
 
@@ -210,7 +350,7 @@ export default function App() {
     setActionLoading(true);
     try {
       showNotice('info', 'Connecting to Google OAuth...');
-      const res = await fetch('/api/auth/connect', {
+      const result = await safeApi<{ url: string; error?: string }>('/api/auth/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -218,17 +358,25 @@ export default function App() {
           clientSecret: csecret || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        throw new Error(data.error || 'Failed to initialize Google OAuth connection.');
+
+      if (!result.ok || !result.data?.url) {
+        throw new Error(result.error || result.data?.error || 'Failed to initialize Google OAuth connection.');
       }
 
       showNotice('info', 'Opening official Google Account authorization...');
-      window.location.href = data.url;
+      window.location.href = result.data.url;
     } catch (err: any) {
       showNotice('error', err.message);
       setActionLoading(false);
     }
+  };
+
+  // Primary Connect Button handler: tries GIS Popup first, falls back gracefully to redirect
+  const handleConnectYouTube = async () => {
+    if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+      return handleConnectWithGisPopup();
+    }
+    return handleConnectRedirect();
   };
 
   // Test Live Private YouTube Upload
@@ -236,12 +384,11 @@ export default function App() {
     setActionLoading(true);
     try {
       showNotice('info', 'Initiating private YouTube test upload...');
-      const res = await fetch('/api/auth/test-upload', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Test upload request failed');
+      const result = await safeApi<{ message?: string; jobId?: string }>('/api/auth/test-upload', { method: 'POST' });
+      if (!result.ok) {
+        throw new Error(result.error || 'Test upload request failed');
       }
-      showNotice('success', data.message || 'Private test upload initiated!');
+      showNotice('success', result.data?.message || 'Private test upload initiated!');
       await fetchState();
     } catch (err: any) {
       showNotice('error', `Test upload failed: ${err.message}`);
@@ -254,12 +401,11 @@ export default function App() {
   const handleVerifySavedCredentials = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/auth/verify', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok || !data.verified) {
-        throw new Error(data.error || 'Live verification failed with Google.');
+      const result = await safeApi<{ verified: boolean; channel?: any }>('/api/auth/verify', { method: 'POST' });
+      if (!result.ok || !result.data?.verified) {
+        throw new Error(result.error || 'Live verification failed with Google.');
       }
-      showNotice('success', `Live test passed! Connected to: ${data.channel?.title || 'YouTube'}`);
+      showNotice('success', `Live test passed! Connected to: ${result.data.channel?.title || 'YouTube'}`);
       await fetchState();
     } catch (err: any) {
       showNotice('error', `YouTube verification test failed: ${err.message}`);
@@ -274,8 +420,8 @@ export default function App() {
     if (!window.confirm('Disconnect your YouTube channel and remove saved credentials from this app?')) return;
     setActionLoading(true);
     try {
-      const res = await fetch('/api/auth/disconnect', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to disconnect');
+      const result = await safeApi('/api/auth/disconnect', { method: 'POST' });
+      if (!result.ok) throw new Error(result.error || 'Failed to disconnect');
       showNotice('info', 'YouTube channel disconnected.');
       await fetchState();
     } catch (err: any) {
@@ -289,7 +435,7 @@ export default function App() {
   const handleGenerateNow = async (forceUpload: boolean = false) => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/videos/generate', {
+      const result = await safeApi('/api/videos/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -297,8 +443,7 @@ export default function App() {
           autoUpload: forceUpload || status?.scheduler.autoUpload,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to start generation');
+      if (!result.ok) throw new Error(result.error || 'Failed to start generation');
       showNotice('success', 'Creation started! Generating MrBeast challenge video...');
       setCustomTopic('');
       await fetchState();
@@ -313,12 +458,12 @@ export default function App() {
   const handleUploadJob = async (jobId: string) => {
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/videos/${jobId}/upload`, {
+      const result = await safeApi(`/api/videos/${jobId}/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ privacyStatus: status?.scheduler.privacyStatus || 'private' }),
       });
-      if (!res.ok) throw new Error('Failed to initiate upload');
+      if (!result.ok) throw new Error(result.error || 'Failed to initiate upload');
       showNotice('info', 'YouTube upload in progress...');
       await fetchState();
     } catch (err: any) {
@@ -368,12 +513,12 @@ export default function App() {
   const handleSaveGeminiKey = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/settings/gemini-key', {
+      const result = await safeApi('/api/settings/gemini-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: geminiKeyInput.trim() }),
       });
-      if (!res.ok) throw new Error('Failed to save API key');
+      if (!result.ok) throw new Error(result.error || 'Failed to save API key');
       showNotice('success', geminiKeyInput.trim() ? 'Gemini AI activated!' : 'Gemini key cleared (using built-in viral templates).');
       setGeminiKeyInput('');
       await fetchState();
@@ -400,7 +545,7 @@ export default function App() {
 
     setActionLoading(true);
     try {
-      const res = await fetch('/api/auth/save-client', {
+      const result = await safeApi('/api/auth/save-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -408,8 +553,7 @@ export default function App() {
           clientSecret: csecret || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save client credentials');
+      if (!result.ok) throw new Error(result.error || 'Failed to save client credentials');
       showNotice('success', 'Web Client credentials saved to server! You can now tap "1-Tap Connect with Google".');
       setCustomClientId('');
       setCustomClientSecret('');
@@ -438,19 +582,18 @@ export default function App() {
       if (customClientSecret.trim()) payload.clientSecret = customClientSecret.trim();
       if (customRefreshToken.trim()) payload.refreshToken = customRefreshToken.trim();
 
-      const res = await fetch('/api/auth/oauth-credentials', {
+      const result = await safeApi<{ channel?: any; message?: string }>('/api/auth/oauth-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to verify OAuth credentials');
+      if (!result.ok) throw new Error(result.error || 'Failed to verify OAuth credentials');
 
-      if (data.channel?.title) {
-        showNotice('success', `Permanent YouTube OAuth connected & verified for: ${data.channel.title}`);
+      if (result.data?.channel?.title) {
+        showNotice('success', `Permanent YouTube OAuth connected & verified for: ${result.data.channel.title}`);
         setShowSettings(false);
       } else {
-        showNotice('success', data.message || 'Credentials successfully saved on server!');
+        showNotice('success', result.data?.message || 'Credentials successfully saved on server!');
       }
       setCustomClientId('');
       setCustomClientSecret('');
@@ -697,40 +840,101 @@ export default function App() {
                   />
                 </div>
 
-                {/* The One Prominent Button */}
-                <button
-                  onClick={handleConnectYouTube}
-                  disabled={actionLoading}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all disabled:opacity-50"
-                >
-                  <Youtube className="w-5 h-5 shrink-0" />
-                  <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel'}</span>
-                </button>
-              </div>
-
-              {/* Redirect URI copy-helper box */}
-              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] space-y-1.5">
-                <div className="font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Authorized Redirect URI for Google Cloud</span>
-                </div>
-                <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-cyan-300 overflow-x-auto">
-                  <span className="truncate flex-1">
-                    {status?.auth.redirectUri || (typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback` : '/api/auth/callback')}
-                  </span>
+                {/* Connect Buttons */}
+                <div className="space-y-2 pt-1">
                   <button
-                    onClick={() => {
-                      const uri = status?.auth.redirectUri || `${window.location.origin}/api/auth/callback`;
-                      navigator.clipboard.writeText(uri);
-                      showNotice('info', 'Redirect URI copied to clipboard!');
-                    }}
-                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
+                    onClick={handleConnectWithGisPopup}
+                    disabled={actionLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all disabled:opacity-50"
                   >
-                    Copy
+                    <Youtube className="w-5 h-5 shrink-0" />
+                    <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel (Google Popup)'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleConnectRedirect}
+                    disabled={actionLoading}
+                    className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center space-x-2 border border-slate-800 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Or Connect via Full-Page Redirect</span>
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-500">
-                  Add this URI in Google Cloud Console → APIs & Services → Credentials → Web Client 5.
+              </div>
+
+              {/* Redirect URI copy-helper box: Preview & Published URLs */}
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800/80 text-[11px] space-y-2">
+                <div className="font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Google Cloud Web Client 5 Authorized Redirect URIs</span>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  In Google Cloud Console → APIs & Services → Credentials → Web Client 5, add both URIs under <strong>Authorized redirect URIs</strong> so login works seamlessly in Preview and Published environments:
                 </p>
+
+                {/* 1. Preview URI */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-amber-400 font-semibold flex items-center justify-between">
+                    <span>1. AI Studio Preview Redirect URI:</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-cyan-300 overflow-x-auto">
+                    <span className="truncate flex-1">
+                      https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback');
+                        showNotice('info', 'Preview Redirect URI copied!');
+                      }}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
+                    >
+                      Copy Preview URI
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Published / Shared App URI */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-emerald-400 font-semibold flex items-center justify-between">
+                    <span>2. Published Website Redirect URI:</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-cyan-300 overflow-x-auto">
+                    <span className="truncate flex-1">
+                      https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback');
+                        showNotice('info', 'Published Redirect URI copied!');
+                      }}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
+                    >
+                      Copy Published URI
+                    </button>
+                  </div>
+                </div>
+
+                {/* If current origin is different (e.g. Vercel or localhost) */}
+                {typeof window !== 'undefined' && !window.location.origin.includes('asia-southeast1.run.app') && (
+                  <div className="space-y-1 pt-1 border-t border-slate-900">
+                    <div className="text-[10px] text-indigo-400 font-semibold">
+                      <span>3. Current Domain Redirect URI:</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-indigo-300 overflow-x-auto">
+                      <span className="truncate flex-1">
+                        {`${window.location.origin}/api/auth/callback`}
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/api/auth/callback`);
+                          showNotice('info', 'Current Domain Redirect URI copied!');
+                        }}
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
+                      >
+                        Copy Current URI
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

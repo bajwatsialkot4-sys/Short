@@ -33,17 +33,20 @@ import {
 
 // Helper to determine canonical HTTPS Redirect URI for Google Cloud OAuth Web Clients
 export function getCanonicalRedirectUri(req: Request): string {
-  const forwardedProto = req.headers['x-forwarded-proto'] as string;
-  const forwardedHost = req.headers['x-forwarded-host'] as string;
-  const host = forwardedHost || req.get('host') || 'localhost:3000';
+  const forwardedProto = (req.headers && (req.headers['x-forwarded-proto'] as string)) || '';
+  const forwardedHost = (req.headers && (req.headers['x-forwarded-host'] as string)) || '';
+  const rawHost = forwardedHost || (typeof req.get === 'function' ? req.get('host') : '') || (req.headers && req.headers.host) || 'localhost:3000';
+  const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
   const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-  const proto = isLocal ? (req.protocol || 'http') : (forwardedProto || 'https');
+  const proto = isLocal ? 'http' : (forwardedProto || 'https');
   return `${proto}://${host}/api/auth/callback`;
 }
 
 // Helper to return recommended Authorized JavaScript Origins
 export function getAuthorizedOrigins(req: Request): string[] {
-  const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'localhost:3000';
+  const forwardedHost = (req.headers && (req.headers['x-forwarded-host'] as string)) || '';
+  const rawHost = forwardedHost || (typeof req.get === 'function' ? req.get('host') : '') || (req.headers && req.headers.host) || 'localhost:3000';
+  const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
   const origins = new Set<string>();
   if (host.includes('localhost')) {
     origins.add(`http://${host}`);
@@ -60,6 +63,14 @@ export function createApiApp(): express.Application {
   const app = express();
   app.set('trust proxy', true);
   app.use(express.json());
+
+  // URL normalizer: support both /api/... and stripped /... (when invoked by Vercel serverless functions)
+  app.use((req, res, next) => {
+    if (req.url && !req.url.startsWith('/api') && req.url !== '/' && !req.url.startsWith('/?')) {
+      req.url = `/api${req.url.startsWith('/') ? '' : '/'}${req.url}`;
+    }
+    next();
+  });
 
   // Initialize background server scheduler
   startScheduler();
@@ -112,6 +123,7 @@ export function createApiApp(): express.Application {
           hasRefreshToken,
           hasClientId,
           hasClientSecret,
+          clientId: auth.clientId || '',
           clientIdMasked,
           isTokenExpired,
           expiresInSeconds,
@@ -793,6 +805,71 @@ export function createApiApp(): express.Application {
     } catch (e: any) {
       logActivity('error', `OAuth callback failed: ${e.message}`);
       res.redirect(`/?auth_error=${encodeURIComponent(e.message)}`);
+    }
+  });
+
+  // 17b. Exchange Authorization Code from Google Identity Services (GIS) Popup or client-side flow
+  app.post('/api/auth/exchange-code', async (req: Request, res: Response) => {
+    try {
+      const { code, redirectUri, clientId, clientSecret } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: 'Authorization code is required' });
+      }
+
+      const auth = loadAuthState();
+      const cleanId = cleanCredentialString(clientId || auth.clientId);
+      const cleanSecret = cleanCredentialString(clientSecret || auth.clientSecret);
+
+      if (!cleanId || !cleanSecret) {
+        return res.status(400).json({
+          error: 'Missing Client ID or Client Secret. Please save them in the app first.',
+        });
+      }
+
+      // In Google Identity Services popup mode, the redirect_uri during code exchange must be 'postmessage'
+      const effectiveRedirectUri = redirectUri || 'postmessage';
+
+      logActivity('auth', `Exchanging Google auth code (redirect_uri: ${effectiveRedirectUri})...`);
+      const { accessToken, refreshToken, expiresIn } = await exchangeGoogleAuthCode(
+        cleanId,
+        cleanSecret,
+        code,
+        effectiveRedirectUri
+      );
+
+      const effectiveRefreshToken = refreshToken || auth.refreshToken;
+      const { channel, error: channelErr } = await getYouTubeChannelInfo(accessToken);
+      if (!channel) {
+        throw new Error(channelErr || 'Authenticated with Google, but could not fetch YouTube channel details. Ensure YouTube Data API v3 is enabled.');
+      }
+
+      updateAuthState({
+        connected: true,
+        clientId: cleanId,
+        clientSecret: cleanSecret,
+        accessToken,
+        refreshToken: effectiveRefreshToken,
+        expiresAt: Date.now() + expiresIn * 1000,
+        tokenSavedAt: Date.now(),
+        channelId: channel.id,
+        channelTitle: channel.title,
+        channelHandle: channel.customUrl || '@channel',
+        channelThumbnail: channel.thumbnailUrl,
+        subscribers: channel.subscriberCount,
+        videoCount: channel.videoCount,
+        authMethod: 'custom_oauth',
+        lastVerifiedAt: Date.now(),
+        lastVerificationError: undefined,
+      });
+
+      logActivity('auth', `YouTube connected successfully: ${channel.title} (${channel.id})`);
+      res.json({
+        success: true,
+        channel,
+      });
+    } catch (e: any) {
+      logActivity('error', `OAuth code exchange failed: ${e.message}`);
+      res.status(400).json({ error: e.message });
     }
   });
 
