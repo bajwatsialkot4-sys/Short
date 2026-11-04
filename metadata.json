@@ -1,0 +1,6 @@
+{
+  "name": "Auto Shorts Creator for YouTube",
+  "description": "Automated MrBeast-inspired challenge Shorts generator and YouTube scheduler.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

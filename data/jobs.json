@@ -1,0 +1,165 @@
+[
+  {
+    "id": "job_1793726623385",
+    "createdAt": "2026-11-03T17:23:43.385Z",
+    "status": "generating_audio",
+    "progress": 15,
+    "statusMessage": "Rendering Scene 1/4: THE SHRINKING CIRCLE",
+    "youtubePrivacyStatus": "private",
+    "script": {
+      "id": "script_1793726623387",
+      "title": "Would You Step In The Red Circle For $250,000? ⭕ #shorts",
+      "description": "50 players entered the red circle. Every 10 minutes the circle shrinks in half! Who survives? 😱\n\n#shorts #challenge #mrbeast #insane #redcircle",
+      "tags": [
+        "shorts",
+        "challenge",
+        "redcircle",
+        "mrbeast",
+        "usa",
+        "entertainment"
+      ],
+      "hook": "Last person to step out of this giant red circle wins 250 THOUSAND DOLLARS!",
+      "climax": "After 28 straight hours, Chris outlasted everyone and took home the quarter-million dollar check! Hit subscribe right now!",
+      "estimatedDurationSec": 45,
+      "scenes": [
+        {
+          "index": 0,
+          "durationSec": 10,
+          "narration": "50 people stepped inside this giant red circle! The rules are simple: touch the outside line for a split second, and you are immediately eliminated!",
+          "headline": "THE SHRINKING CIRCLE",
+          "badgeText": "50 CONTESTANTS",
+          "statNumber": "$250,000",
+          "statLabel": "CASH ON THE LINE",
+          "accentColor": "#EF4444",
+          "subColor": "#B91C1C",
+          "theme": "circle_challenge",
+          "visualType": "hook_intro",
+          "cameraMotion": "punch_zoom",
+          "soundEffect": "whoosh_bass"
+        },
+        {
+          "index": 1,
+          "durationSec": 11,
+          "narration": "Every hour, the circle shrinks by half! People were literally standing on one foot shoulder-to-shoulder just to stay inside!",
+          "headline": "STAGE 2: THE CIRCLE SHRINKS",
+          "badgeText": "30 PEOPLE ELIMINATED",
+          "statNumber": "20 LEFT",
+          "statLabel": "CROWDED CHAOS",
+          "accentColor": "#F59E0B",
+          "subColor": "#D97706",
+          "theme": "circle_challenge",
+          "visualType": "elimination_stage",
+          "cameraMotion": "pan_left",
+          "soundEffect": "siren_alert"
+        },
+        {
+          "index": 2,
+          "durationSec": 12,
+          "narration": "Down to the final three contestants, we unleashed the high-speed dodgeball cannon! One player dodged left, stumbled, and touched the grass!",
+          "headline": "STAGE 4: DODGEBALL CANNON",
+          "badgeText": "EXTREME OBSTACLES",
+          "statNumber": "FINAL 3",
+          "statLabel": "ULTIMATE SHOWDOWN",
+          "accentColor": "#8B5CF6",
+          "subColor": "#7C3AED",
+          "theme": "circle_challenge",
+          "visualType": "extreme_hazard",
+          "cameraMotion": "fast_zoom_out",
+          "soundEffect": "countdown_tick"
+        },
+        {
+          "index": 3,
+          "durationSec": 12,
+          "narration": "After 28 straight hours, Chris outlasted everyone and took home the quarter-million dollar check! Hit subscribe right now!",
+          "headline": "HE WON $250,000!",
+          "badgeText": "EPIC VICTORY",
+          "statNumber": "WINNER! 🏆",
+          "statLabel": "28 HOURS STANDING",
+          "accentColor": "#10B981",
+          "subColor": "#059669",
+          "theme": "circle_challenge",
+          "visualType": "victory_celebration",
+          "cameraMotion": "punch_zoom",
+          "soundEffect": "cash_chime"
+        }
+      ]
+    }
+  },
+  {
+    "id": "job_1792665101761",
+    "createdAt": "2026-10-22T10:31:41.761Z",
+    "status": "ready",
+    "progress": 100,
+    "statusMessage": "Video created locally! Connect YouTube to enable automatic upload.",
+    "videoFilename": "short_job_1792665101761.mp4",
+    "thumbnailFilename": "thumb_job_1792665101761.jpg",
+    "durationSec": 36,
+    "youtubePrivacyStatus": "private",
+    "script": {
+      "id": "script_1792665101762",
+      "title": "Surviving 24 Hours On A Deserted Island For $100,000! 🏝️ #shorts",
+      "description": "Find the $100,000 chest before the tide rises and swallows the beach! 🌊\n\n#shorts #island #challenge #mrbeast #survival",
+      "tags": [
+        "shorts",
+        "island",
+        "challenge",
+        "mrbeast",
+        "viral",
+        "extreme"
+      ],
+      "hook": "I dropped 4 best friends on an isolated island with zero food and $100,000 hidden in the jungle!",
+      "climax": "With 4 minutes left on the clock, Jake unlocked the chest and gold coins erupted everywhere! Subscribe for more insane adventures!",
+      "estimatedDurationSec": 45,
+      "scenes": [
+        {
+          "index": 0,
+          "durationSec": 10,
+          "narration": "I dropped four best friends onto a remote desert island with zero supplies and a buried treasure chest worth 100 THOUSAND DOLLARS!",
+          "headline": "ABANDONED ISLAND",
+          "badgeText": "ZERO SUPPLIES",
+          "statNumber": "$100,000",
+          "statLabel": "BURIED TREASURE",
+          "accentColor": "#06B6D4",
+          "subColor": "#0891B2",
+          "theme": "lava_survival"
+        },
+        {
+          "index": 1,
+          "durationSec": 11,
+          "narration": "They had just six hours to solve three cryptic puzzles before the incoming tide flooded the entire island basecamp!",
+          "headline": "CLUE 1: THE VOLCANO TRAIL",
+          "badgeText": "RACE AGAINST TIDE",
+          "statNumber": "6 HOURS",
+          "statLabel": "UNTIL HIGH TIDE",
+          "accentColor": "#F97316",
+          "subColor": "#EA580C",
+          "theme": "lava_survival"
+        },
+        {
+          "index": 2,
+          "durationSec": 12,
+          "narration": "Deep inside a pitch-black cave, they discovered three mysterious golden keys. But only one key unlocked the master lock!",
+          "headline": "THE HIDDEN CAVE",
+          "badgeText": "DEEP IN THE JUNGLE",
+          "statNumber": "3 KEYS",
+          "statLabel": "ONLY 1 WORKS",
+          "accentColor": "#EC4899",
+          "subColor": "#DB2777",
+          "theme": "lava_survival"
+        },
+        {
+          "index": 3,
+          "durationSec": 12,
+          "narration": "With 4 minutes left on the clock, Jake unlocked the chest and gold coins erupted everywhere! Subscribe for more insane adventures!",
+          "headline": "CHEST UNLOCKED!",
+          "badgeText": "TOTAL CELEBRATION",
+          "statNumber": "$100,000",
+          "statLabel": "COLD CASH FOUND",
+          "accentColor": "#10B981",
+          "subColor": "#059669",
+          "theme": "lava_survival"
+        }
+      ]
+    }
+  }
+]

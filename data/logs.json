@@ -1,0 +1,176 @@
+[
+  {
+    "id": "log_1793772931120_jvdjg",
+    "timestamp": "2026-11-04T06:15:31.120Z",
+    "type": "error",
+    "message": "OAuth credentials validation failed: Google OAuth Error 401 (invalid_client): \"The OAuth client was not found.\" Google Cloud could not locate an OAuth Web Client with this Client ID. Please check that you copied the complete Client ID (ending in .apps.googleusercontent.com) from Google Cloud Console Web Client 5 without extra characters or quotes."
+  },
+  {
+    "id": "log_1793772931044_99i9r",
+    "timestamp": "2026-11-04T06:15:31.044Z",
+    "type": "auth",
+    "message": "Testing and persisting Google OAuth credentials for YouTube..."
+  },
+  {
+    "id": "log_1793772914209_5mslu",
+    "timestamp": "2026-11-04T06:15:14.209Z",
+    "type": "auth",
+    "message": "Google OAuth Client ID & Secret saved to persistent server storage."
+  },
+  {
+    "id": "log_1793772899892_1i4j6",
+    "timestamp": "2026-11-04T06:14:59.892Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793772884393_l2k0j",
+    "timestamp": "2026-11-04T06:14:44.393Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793772271055_5tfsv",
+    "timestamp": "2026-11-04T06:04:31.055Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793726623392_m2jq1",
+    "timestamp": "2026-11-03T17:23:43.392Z",
+    "type": "generation",
+    "message": "Starting multi-scene video generation for job job_1793726623385"
+  },
+  {
+    "id": "log_1793726623387_wep0k",
+    "timestamp": "2026-11-03T17:23:43.387Z",
+    "type": "generation",
+    "message": "Created viral MrBeast challenge script: \"Would You Step In The Red Circle For $250,000? ⭕ #shorts\""
+  },
+  {
+    "id": "log_1793726623386_eg2t2",
+    "timestamp": "2026-11-03T17:23:43.386Z",
+    "type": "generation",
+    "message": "[JOB job_1793726623385] Started automated generation pipeline"
+  },
+  {
+    "id": "log_1793726623384_v0w87",
+    "timestamp": "2026-11-03T17:23:43.384Z",
+    "type": "generation",
+    "message": "Manual trigger requested: random MrBeast challenge"
+  },
+  {
+    "id": "log_1793726555488_z1o9v",
+    "timestamp": "2026-11-03T17:22:35.488Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793726220413_fmkzd",
+    "timestamp": "2026-11-03T17:17:00.413Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793710897588_i7y4r",
+    "timestamp": "2026-11-03T13:01:37.588Z",
+    "type": "error",
+    "message": "OAuth credentials validation failed: Failed to refresh Google OAuth token (401): {\n  \"error\": \"invalid_client\",\n  \"error_description\": \"The OAuth client was not found.\"\n}"
+  },
+  {
+    "id": "log_1793710897519_2nbby",
+    "timestamp": "2026-11-03T13:01:37.519Z",
+    "type": "auth",
+    "message": "Testing and persisting Google OAuth credentials for YouTube..."
+  },
+  {
+    "id": "log_1793710865513_85xrt",
+    "timestamp": "2026-11-03T13:01:05.513Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793710433114_qza98",
+    "timestamp": "2026-11-03T12:53:53.114Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1792734604310_kuwth",
+    "timestamp": "2026-10-23T05:50:04.310Z",
+    "type": "scheduler",
+    "message": "[CRON TRIGGER] External ping received at 10:50 PKT (2026-10-23)"
+  },
+  {
+    "id": "log_1792734578540_a7lqo",
+    "timestamp": "2026-10-23T05:49:38.540Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1792734458554_826yp",
+    "timestamp": "2026-10-23T05:47:38.554Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1792670110640_8coct",
+    "timestamp": "2026-10-22T11:55:10.640Z",
+    "type": "system",
+    "message": "Gemini API key cleared (using built-in viral templates)."
+  },
+  {
+    "id": "log_1792670103686_t83ep",
+    "timestamp": "2026-10-22T11:55:03.686Z",
+    "type": "system",
+    "message": "Gemini API key configured."
+  },
+  {
+    "id": "log_1792670094524_h1y50",
+    "timestamp": "2026-10-22T11:54:54.524Z",
+    "type": "scheduler",
+    "message": "[CRON TRIGGER] External ping received at 16:54 PKT (2026-10-22)"
+  },
+  {
+    "id": "log_1792670080515_ioihy",
+    "timestamp": "2026-10-22T11:54:40.515Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1792669635298_j4x4d",
+    "timestamp": "2026-10-22T11:47:15.298Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1792665101765_5nfhs",
+    "timestamp": "2026-10-22T10:31:41.765Z",
+    "type": "generation",
+    "message": "Starting audio generation for job job_1792665101761"
+  },
+  {
+    "id": "log_1792665101762_i6j75",
+    "timestamp": "2026-10-22T10:31:41.762Z",
+    "type": "generation",
+    "message": "Created viral MrBeast challenge script: \"Surviving 24 Hours On A Deserted Island For $100,000! 🏝️ #shorts\""
+  },
+  {
+    "id": "log_1792665101762_1x3fj",
+    "timestamp": "2026-10-22T10:31:41.762Z",
+    "type": "generation",
+    "message": "[JOB job_1792665101761] Started automated generation pipeline"
+  },
+  {
+    "id": "log_1792665101761_4uk2e",
+    "timestamp": "2026-10-22T10:31:41.761Z",
+    "type": "generation",
+    "message": "Manual trigger requested: random MrBeast challenge"
+  },
+  {
+    "id": "log_1792665086652_ltrke",
+    "timestamp": "2026-10-22T10:31:26.652Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  }
+]
