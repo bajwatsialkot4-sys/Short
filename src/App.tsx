@@ -119,6 +119,7 @@ export default function App() {
   const [customClientId, setCustomClientId] = useState<string>('');
   const [customClientSecret, setCustomClientSecret] = useState<string>('');
   const [customRefreshToken, setCustomRefreshToken] = useState<string>('');
+  const [generatedAuthUrl, setGeneratedAuthUrl] = useState<string | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
   const [diagnosticsData, setDiagnosticsData] = useState<any>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -375,6 +376,7 @@ export default function App() {
         throw new Error(result.error || result.data?.error || 'Failed to initialize Google OAuth connection.');
       }
 
+      setGeneratedAuthUrl(result.data.url);
       showNotice('info', 'Opening official Google Account authorization...');
       
       // If running inside an iFrame (e.g. AI Studio preview), Google OAuth blocks iframe embedding.
@@ -866,7 +868,52 @@ export default function App() {
                   />
                 </div>
 
-                {/* Connect Buttons */}
+                {/* Optional Refresh Token Field (Instant Direct Connection) */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                    <span>3. Google Refresh Token (Optional — Direct Verification)</span>
+                    {status?.auth.hasRefreshToken && (
+                      <span className="text-[10px] text-emerald-400 font-normal">
+                        Token saved on server
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="password"
+                    value={customRefreshToken}
+                    onChange={(e) => setCustomRefreshToken(e.target.value)}
+                    placeholder={
+                      status?.auth.hasRefreshToken
+                        ? '•••••••••••••••• (Refresh Token saved on server)'
+                        : 'Optional: Paste Refresh Token (1//...) if already generated'
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-red-500 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none transition-colors"
+                  />
+                </div>
+
+                {/* Direct Unblockable Auth Link when generated */}
+                {generatedAuthUrl && (
+                  <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/60 text-xs space-y-2 animate-in fade-in">
+                    <div className="font-bold text-emerald-300 flex items-center space-x-1.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Official Google Authorization Link Ready</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Tap below to open Google's official account selector directly in a new tab:
+                    </p>
+                    <a
+                      href={generatedAuthUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center space-x-2 transition-all shadow-md"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Open Official Google Authorization (New Tab)</span>
+                    </a>
+                  </div>
+                )}
+
+                {/* Connect Action Buttons */}
                 <div className="space-y-2 pt-1">
                   <button
                     onClick={handleConnectYouTube}
@@ -874,20 +921,19 @@ export default function App() {
                     className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all disabled:opacity-50"
                   >
                     <Youtube className="w-5 h-5 shrink-0" />
-                    <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel'}</span>
+                    <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel (Official Web Flow)'}</span>
                   </button>
-                  <p className="text-[10px] text-emerald-400/90 text-center font-medium">
-                    ⚡ Standard Web Redirection — Validates Authorized Redirect URIs only (No origin registration required)
-                  </p>
 
-                  <button
-                    onClick={handleConnectWithGisPopup}
-                    disabled={actionLoading}
-                    className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center justify-center space-x-2 border border-slate-800 transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Or Connect via Google Popup Window (Requires Registered JavaScript Origin)</span>
-                  </button>
+                  {customRefreshToken.trim() && (
+                    <button
+                      onClick={handleSaveCustomOAuth}
+                      disabled={actionLoading}
+                      className="w-full py-2.5 px-3 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-200 text-xs font-semibold flex items-center justify-center space-x-2 border border-emerald-800 transition-colors"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Verify & Connect With Entered Refresh Token</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

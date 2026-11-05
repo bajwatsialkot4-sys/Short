@@ -629,7 +629,6 @@ export function createApiApp(): express.Application {
       const scopes = [
         'https://www.googleapis.com/auth/youtube.upload',
         'https://www.googleapis.com/auth/youtube.readonly',
-        'https://www.googleapis.com/auth/youtube.force-ssl',
         'openid',
         'profile',
         'email',
@@ -642,7 +641,7 @@ export function createApiApp(): express.Application {
         scope: scopes,
         access_type: 'offline',
         prompt: 'consent select_account',
-        include_granted_scopes: 'true',
+        login_hint: 'ukusa2439@gmail.com',
         state: statePayload,
       });
 
@@ -749,7 +748,6 @@ export function createApiApp(): express.Application {
       const scopes = [
         'https://www.googleapis.com/auth/youtube.upload',
         'https://www.googleapis.com/auth/youtube.readonly',
-        'https://www.googleapis.com/auth/youtube.force-ssl',
         'openid',
         'profile',
         'email',
@@ -762,7 +760,7 @@ export function createApiApp(): express.Application {
         scope: scopes,
         access_type: 'offline',
         prompt: 'consent select_account',
-        include_granted_scopes: 'true',
+        login_hint: 'ukusa2439@gmail.com',
       });
 
       const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

@@ -1,5 +1,41 @@
 [
   {
+    "id": "log_1793875134795_rl6s5",
+    "timestamp": "2026-11-05T10:38:54.795Z",
+    "type": "error",
+    "message": "OAuth credentials validation failed: Google OAuth Error 401 (invalid_client): \"The OAuth client was not found.\" Google Cloud could not locate an OAuth Web Client with this Client ID. Please check that you copied the complete Client ID (ending in .apps.googleusercontent.com) from Google Cloud Console Web Client 5 without extra characters or quotes."
+  },
+  {
+    "id": "log_1793875134688_21z96",
+    "timestamp": "2026-11-05T10:38:54.688Z",
+    "type": "auth",
+    "message": "Testing and persisting Google OAuth credentials for YouTube..."
+  },
+  {
+    "id": "log_1793875129321_2f4mh",
+    "timestamp": "2026-11-05T10:38:49.321Z",
+    "type": "error",
+    "message": "OAuth consent denied by user: access_denied"
+  },
+  {
+    "id": "log_1793875107021_6r9xr",
+    "timestamp": "2026-11-05T10:38:27.021Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL: redirect_uri=https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback | client_id=123456-test....pps.googleusercontent.com"
+  },
+  {
+    "id": "log_1793875102536_q0ux8",
+    "timestamp": "2026-11-05T10:38:22.536Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793874817725_y9tq4",
+    "timestamp": "2026-11-05T10:33:37.726Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
     "id": "log_1793805642030_tqbww",
     "timestamp": "2026-11-04T15:20:42.030Z",
     "type": "auth",
