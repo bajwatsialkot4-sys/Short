@@ -1,5 +1,23 @@
 [
   {
+    "id": "log_1793805642030_tqbww",
+    "timestamp": "2026-11-04T15:20:42.030Z",
+    "type": "auth",
+    "message": "Generated official Google OAuth consent URL: redirect_uri=https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback | client_id=123456-test....pps.googleusercontent.com"
+  },
+  {
+    "id": "log_1793805627058_al9pp",
+    "timestamp": "2026-11-04T15:20:27.058Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
+    "id": "log_1793805090450_rrd5u",
+    "timestamp": "2026-11-04T15:11:30.450Z",
+    "type": "scheduler",
+    "message": "Server-side automated scheduler started (Asia/Karachi timezone, 03:00 & 16:00 PKT)"
+  },
+  {
     "id": "log_1793804409898_uctkk",
     "timestamp": "2026-11-04T15:00:09.898Z",
     "type": "auth",

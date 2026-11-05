@@ -31,28 +31,44 @@ import {
   startScheduler,
 } from './scheduler.ts';
 
-// Helper to determine canonical HTTPS Redirect URI for Google Cloud OAuth Web Clients
-export function getCanonicalRedirectUri(req: Request): string {
+// Helper to determine the client or server origin dynamically
+export function getCanonicalOrigin(req: Request, fallbackOrigin?: string): string {
+  if (fallbackOrigin && (fallbackOrigin.startsWith('http://') || fallbackOrigin.startsWith('https://'))) {
+    return fallbackOrigin.replace(/\/+$/, '');
+  }
+  const reqOrigin = (req.headers && (req.headers.origin as string)) || '';
+  if (reqOrigin && (reqOrigin.startsWith('http://') || reqOrigin.startsWith('https://'))) {
+    return reqOrigin.replace(/\/+$/, '');
+  }
+  const reqReferer = (req.headers && (req.headers.referer as string)) || '';
+  if (reqReferer) {
+    try {
+      const u = new URL(reqReferer);
+      return u.origin;
+    } catch {}
+  }
   const forwardedProto = (req.headers && (req.headers['x-forwarded-proto'] as string)) || '';
   const forwardedHost = (req.headers && (req.headers['x-forwarded-host'] as string)) || '';
   const rawHost = forwardedHost || (typeof req.get === 'function' ? req.get('host') : '') || (req.headers && req.headers.host) || 'localhost:3000';
   const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
   const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
   const proto = isLocal ? 'http' : (forwardedProto || 'https');
-  return `${proto}://${host}/api/auth/callback`;
+  return `${proto}://${host}`.replace(/\/+$/, '');
+}
+
+// Helper to determine canonical HTTPS Redirect URI for Google Cloud OAuth Web Clients
+export function getCanonicalRedirectUri(req: Request, clientOrigin?: string): string {
+  const origin = getCanonicalOrigin(req, clientOrigin);
+  return `${origin}/api/auth/callback`;
 }
 
 // Helper to return recommended Authorized JavaScript Origins
 export function getAuthorizedOrigins(req: Request): string[] {
-  const forwardedHost = (req.headers && (req.headers['x-forwarded-host'] as string)) || '';
-  const rawHost = forwardedHost || (typeof req.get === 'function' ? req.get('host') : '') || (req.headers && req.headers.host) || 'localhost:3000';
-  const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
   const origins = new Set<string>();
-  if (host.includes('localhost')) {
-    origins.add(`http://${host}`);
-    origins.add('http://localhost:3000');
-  } else {
-    origins.add(`https://${host}`);
+  const detected = getCanonicalOrigin(req);
+  if (detected) origins.add(detected);
+  if (process.env.APP_URL) {
+    origins.add(process.env.APP_URL.replace(/\/+$/, ''));
   }
   origins.add('https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app');
   origins.add('https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app');
@@ -601,7 +617,15 @@ export function createApiApp(): express.Application {
         clientSecret: cleanSecret,
       });
 
-      const redirectUri = getCanonicalRedirectUri(req);
+      const clientOrigin = req.body.origin ? String(req.body.origin).trim().replace(/\/+$/, '') : '';
+      const redirectUri = getCanonicalRedirectUri(req, clientOrigin);
+
+      // Embed redirectUri and timestamp in state parameter to guarantee exact match on callback
+      const statePayload = Buffer.from(JSON.stringify({
+        redirectUri,
+        t: Date.now(),
+      })).toString('base64url');
+
       const scopes = [
         'https://www.googleapis.com/auth/youtube.upload',
         'https://www.googleapis.com/auth/youtube.readonly',
@@ -619,15 +643,18 @@ export function createApiApp(): express.Application {
         access_type: 'offline',
         prompt: 'consent select_account',
         include_granted_scopes: 'true',
+        state: statePayload,
       });
 
       const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-      logActivity('auth', 'Generated official Google OAuth consent URL for user.');
+      const safeId = cleanId.length > 20 ? `${cleanId.slice(0, 12)}...${cleanId.slice(-25)}` : 'client-id-set';
+      logActivity('auth', `Generated official Google OAuth consent URL: redirect_uri=${redirectUri} | client_id=${safeId}`);
 
       res.json({
         success: true,
         url,
         redirectUri,
+        origin: clientOrigin || getCanonicalOrigin(req),
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -763,8 +790,17 @@ export function createApiApp(): express.Application {
         return res.redirect('/?auth_error=Missing+Client+ID+or+Client+Secret+on+server');
       }
 
-      const redirectUri = getCanonicalRedirectUri(req);
-      logActivity('auth', 'Exchanging Google auth code for Web Client 5...');
+      let redirectUri = getCanonicalRedirectUri(req);
+      if (req.query.state) {
+        try {
+          const parsedState = JSON.parse(Buffer.from(req.query.state as string, 'base64url').toString('utf8'));
+          if (parsedState.redirectUri && typeof parsedState.redirectUri === 'string') {
+            redirectUri = parsedState.redirectUri;
+          }
+        } catch {}
+      }
+
+      logActivity('auth', `Exchanging Google auth code for Web Client 5 (redirect_uri: ${redirectUri})...`);
 
       const { accessToken, refreshToken, expiresIn } = await exchangeGoogleAuthCode(
         auth.clientId,
@@ -870,6 +906,61 @@ export function createApiApp(): express.Application {
     } catch (e: any) {
       logActivity('error', `OAuth code exchange failed: ${e.message}`);
       res.status(400).json({ error: e.message });
+    }
+  });
+
+  // 17c. Safe OAuth Diagnostics (strictly scrubs all client secrets, access tokens, and refresh tokens)
+  app.get('/api/auth/diagnostics', (req: Request, res: Response) => {
+    try {
+      const auth = loadAuthState();
+      const detectedOrigin = getCanonicalOrigin(req);
+      const canonicalRedirectUri = getCanonicalRedirectUri(req);
+      const allOrigins = getAuthorizedOrigins(req);
+
+      let clientIdMasked = 'Not configured';
+      if (auth.clientId) {
+        const parts = auth.clientId.split('-');
+        if (parts.length > 1) {
+          clientIdMasked = `${parts[0]}-••••••••.apps.googleusercontent.com`;
+        } else {
+          clientIdMasked = `${auth.clientId.substring(0, 10)}••••••••`;
+        }
+      }
+
+      const allLogs = loadLogs();
+      const safeAuthLogs = allLogs
+        .filter(l => l.type === 'auth' || l.type === 'error')
+        .slice(-8)
+        .map(l => ({
+          timestamp: l.timestamp,
+          type: l.type,
+          message: l.message,
+        }));
+
+      res.json({
+        browserOrigin: detectedOrigin,
+        canonicalRedirectUri,
+        authorizedOrigins: allOrigins,
+        hasClientId: Boolean(auth.clientId),
+        clientIdMasked,
+        hasClientSecret: Boolean(auth.clientSecret),
+        hasRefreshToken: Boolean(auth.refreshToken),
+        connected: Boolean(auth.connected),
+        channelTitle: auth.channelTitle,
+        lastVerifiedAt: auth.lastVerifiedAt,
+        lastVerificationError: auth.lastVerificationError,
+        previewEnvironment: {
+          origin: 'https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app',
+          redirectUri: 'https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback',
+        },
+        sharedEnvironment: {
+          origin: 'https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app',
+          redirectUri: 'https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback',
+        },
+        safeRecentLogs: safeAuthLogs,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 

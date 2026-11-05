@@ -119,6 +119,8 @@ export default function App() {
   const [customClientId, setCustomClientId] = useState<string>('');
   const [customClientSecret, setCustomClientSecret] = useState<string>('');
   const [customRefreshToken, setCustomRefreshToken] = useState<string>('');
+  const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
+  const [diagnosticsData, setDiagnosticsData] = useState<any>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -165,6 +167,15 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchDiagnostics = async () => {
+    try {
+      const res = await safeApi('/api/auth/diagnostics');
+      if (res.ok && res.data) {
+        setDiagnosticsData(res.data);
+      }
+    } catch {}
   };
 
   useEffect(() => {
@@ -356,6 +367,7 @@ export default function App() {
         body: JSON.stringify({
           clientId: cid || undefined,
           clientSecret: csecret || undefined,
+          origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         }),
       });
 
@@ -364,18 +376,32 @@ export default function App() {
       }
 
       showNotice('info', 'Opening official Google Account authorization...');
-      window.location.href = result.data.url;
+      
+      // If running inside an iFrame (e.g. AI Studio preview), Google OAuth blocks iframe embedding.
+      // Open in top-level window or new tab so Google can validate origins cleanly.
+      const isFramed = typeof window !== 'undefined' && window.self !== window.top;
+      if (isFramed) {
+        try {
+          const popup = window.open(result.data.url, '_blank', 'noopener,noreferrer');
+          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            window.location.href = result.data.url;
+          }
+        } catch {
+          window.location.href = result.data.url;
+        }
+      } else {
+        window.location.href = result.data.url;
+      }
     } catch (err: any) {
       showNotice('error', err.message);
       setActionLoading(false);
     }
   };
 
-  // Primary Connect Button handler: tries GIS Popup first, falls back gracefully to redirect
+  // Primary Connect Button handler: runs standard Google OAuth 2.0 Web Redirection.
+  // Standard Web Redirection checks ONLY Authorized redirect URIs and does NOT require JavaScript origin registration,
+  // completely avoiding the "no registered origin (Error 401: invalid_client)" error.
   const handleConnectYouTube = async () => {
-    if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
-      return handleConnectWithGisPopup();
-    }
     return handleConnectRedirect();
   };
 
@@ -843,40 +869,69 @@ export default function App() {
                 {/* Connect Buttons */}
                 <div className="space-y-2 pt-1">
                   <button
-                    onClick={handleConnectWithGisPopup}
+                    onClick={handleConnectYouTube}
                     disabled={actionLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all disabled:opacity-50"
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center space-x-2.5 shadow-lg shadow-red-600/25 transition-all disabled:opacity-50"
                   >
                     <Youtube className="w-5 h-5 shrink-0" />
-                    <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel (Google Popup)'}</span>
+                    <span>{actionLoading ? 'Connecting to Google...' : 'Connect My YouTube Channel'}</span>
                   </button>
+                  <p className="text-[10px] text-emerald-400/90 text-center font-medium">
+                    ⚡ Standard Web Redirection — Validates Authorized Redirect URIs only (No origin registration required)
+                  </p>
 
                   <button
-                    onClick={handleConnectRedirect}
+                    onClick={handleConnectWithGisPopup}
                     disabled={actionLoading}
-                    className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center space-x-2 border border-slate-800 transition-colors"
+                    className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center justify-center space-x-2 border border-slate-800 transition-colors"
                   >
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Or Connect via Full-Page Redirect</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Or Connect via Google Popup Window (Requires Registered JavaScript Origin)</span>
                   </button>
                 </div>
               </div>
 
-              {/* Redirect URI copy-helper box: Preview & Published URLs */}
-              <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800/80 text-[11px] space-y-2">
-                <div className="font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Google Cloud Web Client 5 Authorized Redirect URIs</span>
+              {/* Exact Google Cloud Web Client 5 Configuration Helper */}
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800/80 text-[11px] space-y-3">
+                <div className="font-semibold text-slate-200 flex items-center justify-between">
+                  <span>Google Cloud Web Client 5 Configuration</span>
+                  <span className="text-[10px] text-amber-400 font-mono font-normal">
+                    {status?.auth.clientIdMasked || 'Client ID not saved'}
+                  </span>
                 </div>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  In Google Cloud Console → APIs & Services → Credentials → Web Client 5, add both URIs under <strong>Authorized redirect URIs</strong> so login works seamlessly in Preview and Published environments:
-                </p>
 
-                {/* 1. Preview URI */}
-                <div className="space-y-1">
-                  <div className="text-[10px] text-amber-400 font-semibold flex items-center justify-between">
-                    <span>1. AI Studio Preview Redirect URI:</span>
+                {/* Section A: Authorized Redirect URIs (Required for Standard Flow) */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-900">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-emerald-400">
+                      1. Authorized redirect URIs (Primary Flow)
+                    </span>
+                    <span className="text-[10px] text-slate-500">Includes /api/auth/callback</span>
                   </div>
+                  <p className="text-[10px] text-slate-400">
+                    Add these in Google Cloud Console → APIs & Services → Credentials → Web Client 5:
+                  </p>
+
+                  {/* Active Window Redirect URI */}
+                  <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-emerald-900/50 font-mono text-[10px] text-emerald-300 overflow-x-auto">
+                    <span className="text-[10px] text-emerald-500 font-bold shrink-0">Current:</span>
+                    <span className="truncate flex-1">
+                      {typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback` : '/api/auth/callback'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/api/auth/callback`);
+                        showNotice('info', 'Current Redirect URI copied!');
+                      }}
+                      className="px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-200 font-sans text-[10px] shrink-0 border border-emerald-800"
+                    >
+                      Copy URI
+                    </button>
+                  </div>
+
+                  {/* Preview Redirect URI */}
                   <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-cyan-300 overflow-x-auto">
+                    <span className="text-[10px] text-slate-500 font-bold shrink-0">Preview:</span>
                     <span className="truncate flex-1">
                       https://ais-dev-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback
                     </span>
@@ -887,54 +942,127 @@ export default function App() {
                       }}
                       className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
                     >
-                      Copy Preview URI
+                      Copy URI
                     </button>
                   </div>
-                </div>
 
-                {/* 2. Published / Shared App URI */}
-                <div className="space-y-1">
-                  <div className="text-[10px] text-emerald-400 font-semibold flex items-center justify-between">
-                    <span>2. Published Website Redirect URI:</span>
-                  </div>
+                  {/* Shared/Production Redirect URI */}
                   <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-cyan-300 overflow-x-auto">
+                    <span className="text-[10px] text-slate-500 font-bold shrink-0">Shared:</span>
                     <span className="truncate flex-1">
                       https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback
                     </span>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText('https://ais-pre-4rudwnyalwoejvn3czvszv-982797818827.asia-southeast1.run.app/api/auth/callback');
-                        showNotice('info', 'Published Redirect URI copied!');
+                        showNotice('info', 'Shared Redirect URI copied!');
                       }}
                       className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
                     >
-                      Copy Published URI
+                      Copy URI
                     </button>
                   </div>
                 </div>
 
-                {/* If current origin is different (e.g. Vercel or localhost) */}
-                {typeof window !== 'undefined' && !window.location.origin.includes('asia-southeast1.run.app') && (
-                  <div className="space-y-1 pt-1 border-t border-slate-900">
-                    <div className="text-[10px] text-indigo-400 font-semibold">
-                      <span>3. Current Domain Redirect URI:</span>
-                    </div>
-                    <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-slate-800 font-mono text-[10px] text-indigo-300 overflow-x-auto">
-                      <span className="truncate flex-1">
-                        {`${window.location.origin}/api/auth/callback`}
-                      </span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}/api/auth/callback`);
-                          showNotice('info', 'Current Domain Redirect URI copied!');
-                        }}
-                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-white font-sans text-[10px] shrink-0"
-                      >
-                        Copy Current URI
-                      </button>
-                    </div>
+                {/* Section B: Authorized JavaScript Origins (Only required if using Popup mode) */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-900">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-amber-400">
+                      2. Authorized JavaScript origins (Popup Flow Only)
+                    </span>
+                    <span className="text-[10px] text-slate-500">Origin only (NO /path)</span>
                   </div>
-                )}
+                  <p className="text-[10px] text-slate-400">
+                    If you prefer Google Popup mode, add these under <strong>Authorized JavaScript origins</strong>:
+                  </p>
+
+                  {/* Active Origin */}
+                  <div className="flex items-center space-x-1.5 bg-slate-900 p-1.5 rounded border border-amber-900/50 font-mono text-[10px] text-amber-300 overflow-x-auto">
+                    <span className="text-[10px] text-amber-500 font-bold shrink-0">Current:</span>
+                    <span className="truncate flex-1">
+                      {typeof window !== 'undefined' ? window.location.origin : ''}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.origin);
+                        showNotice('info', 'Current Origin copied!');
+                      }}
+                      className="px-2 py-0.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-200 font-sans text-[10px] shrink-0 border border-amber-800"
+                    >
+                      Copy Origin
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Diagnostic Inspector Toggle */}
+                <div className="pt-2 border-t border-slate-900">
+                  <button
+                    onClick={() => {
+                      if (!showDiagnostics) fetchDiagnostics();
+                      setShowDiagnostics(!showDiagnostics);
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center justify-between border border-slate-800 transition-colors"
+                  >
+                    <span className="flex items-center space-x-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{showDiagnostics ? 'Hide Live OAuth Diagnostics' : 'Inspect Live OAuth & Origin Diagnostics'}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {showDiagnostics ? '▲ Collapse' : '▼ Expand'}
+                    </span>
+                  </button>
+
+                  {showDiagnostics && (
+                    <div className="mt-2.5 p-3 rounded-lg bg-slate-950 border border-cyan-900/40 text-[10px] space-y-2 animate-in fade-in">
+                      <div className="font-bold text-cyan-300 text-xs">Live System OAuth Diagnostics:</div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                          <span className="text-slate-400 block">Active Client ID:</span>
+                          <span className="font-mono text-slate-200 break-all">
+                            {diagnosticsData?.clientIdMasked || status?.auth.clientIdMasked || (customClientId ? `${customClientId.slice(0, 10)}...` : 'Not saved')}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                          <span className="text-slate-400 block">Client Secret:</span>
+                          <span className="font-mono text-emerald-400">
+                            {status?.auth.hasClientSecret ? '✓ Securely Saved on Server' : 'Missing'}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                          <span className="text-slate-400 block">Target Account:</span>
+                          <span className="font-mono text-amber-300">ukusa2439@gmail.com</span>
+                        </div>
+                        <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                          <span className="text-slate-400 block">Active Origin:</span>
+                          <span className="font-mono text-cyan-300 truncate block">
+                            {typeof window !== 'undefined' ? window.location.origin : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Safe Recent Auth Activity Logs */}
+                      {diagnosticsData?.safeRecentLogs && diagnosticsData.safeRecentLogs.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-900">
+                          <span className="text-slate-400 font-semibold block mb-1">Recent Auth Events (Sanitized):</span>
+                          <div className="space-y-1 font-mono text-[9px] max-h-28 overflow-y-auto">
+                            {diagnosticsData.safeRecentLogs.map((log: any, idx: number) => (
+                              <div key={idx} className="p-1 rounded bg-black/40 text-slate-300 border border-slate-900 flex items-start space-x-1.5">
+                                <span className="text-slate-500 shrink-0">
+                                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                </span>
+                                <span className={log.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}>
+                                  [{log.type.toUpperCase()}]
+                                </span>
+                                <span className="flex-1 break-words">{log.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
